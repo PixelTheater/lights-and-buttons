@@ -4,6 +4,15 @@
 #include "is31fl3733.hpp"
 #include "Ticker.h"
 
+// This example demonstrates how to use the IS31FL3733 LED driver with the Adafruit TCA8418 keypad driver.
+// The IS31FL3733 is a 12x16 LED matrix driver with PWM control for each LED. The Adafruit TCA8418 is a
+// keypad matrix driver with buffering and debouncing. This example uses the IS31FL3733 to drive a 
+// 4x4 LED matrix and the TCA8418 to read a 4x4 keypad. 
+
+// The keypad is used to set the brightness of the LEDs in the matrix.
+
+// for more info see https://github.com/somebox/lights-and-buttons
+
 using namespace IS31FL3733;
 // Function prototypes for the read and write functions defined later in the file.
 uint8_t i2c_read_reg(const uint8_t i2c_addr, const uint8_t reg_addr, uint8_t *buffer, const uint8_t length);
