@@ -1,25 +1,89 @@
 # Lights-and-Buttons
 
 A small I2C breakout board for controlling lots of LEDs and buttons/switches.
+
 It features two fabulous ICs on the same PCB:
 
-- the *TCA8418 keypad controller*: scans up to 80 separate contact points in an 8x10 matrix, and features queuing and debouncing. Well-supported driver from Adafruit.
-- the *IS31FL3737 LED driver*: This versitile chip can control a matrix of 144 (12x12) LEDs with 256 levels of individual dimming. Here we use a compatible IS31FL3733 driver, but this should be adapted in the future.
+- **TCA8418 keypad controller**: scans up to 80 separate contact points in an 8×10 matrix, with queuing and debouncing
+- **IS31FL3737 LED driver**: controls a matrix of 144 (12×12) LEDs with 256 levels of individual dimming
 
-Both I2C devices are present on the same board with the connections available. There's a jumper to set the I2C address of the LED driver. The keypad driver only supports one I2C address, so there's a jumper to disable it. Using these jumpers, multiple boards can be connected to support more LEDs if desired.
+Both I2C devices are present on the same board with configurable addresses via jumpers. Multiple boards can be connected to support more LEDs if desired.
 
-This code example shows the use of a 4x4 button panel (16 in total), where each button has an LED built-in, and an ESP32 driving the project. When the user presses a button and holds it down, the LED will begin to flash depending on how long the button was held.
+This ESP32-based firmware demonstrates three operational modes: animated patterns, button-controlled effects, and hardware debugging.
+
+## Hardware
+
+- **ESP32** microcontroller with I2C communication
+- **TCA8418** keypad controller (up to 8×10 button matrix)
+- **IS31FL3737** LED driver (12×12 LED matrix with PWM dimming)
+- Mode switching via GPIO button
+- Onboard LED for diagnostics
+
+## Features
+
+The firmware demonstrates three operational modes:
+
+- **ANIMATED**: Automatic position-dependent fade patterns across all LEDs
+- **INTERACTIVE**: Button presses trigger corresponding LED animations  
+- **DEBUG**: Sequential LED testing for hardware validation
+
+Switch between modes using the mode button (GPIO 0). The onboard LED provides visual feedback for button presses and system errors.
 
 ![PCB Top](docs/pcb-top-3d.png)
 ![PCB Bottom](docs/pcb-bottom-3d.png)
 
-I originally developed this project to create some art projects and one-off fidget toys, and it makes it easy to mock things up. Another nice use is for miniatures and models - you can connect a lot of LEDs and not need to worry about wiring in resistors or adjusting brightness, as the LED driver takes care of all of that. Plus there's a load of contacts that can be used for buttons. 
+## Project Background
 
-This solution was inspired by [Adafruit's keypad controller breakout](https://www.adafruit.com/product/4918#description), and their open source driver is used in this example. Please support them.
+I originally developed this project to create art projects and one-off fidget toys, making it easy to mock up interactive installations. It's also useful for miniatures and models - you can connect many LEDs without worrying about wiring resistors or adjusting brightness, as the LED driver handles all of that. Plus there are plenty of contacts for buttons.
 
-Here are some pictures of the test rig this code was used on. It's using standard 16mm LED buttons (search for "R16-503") which have four contacts each, I made a small PCB for them and soldered copper rods to the columns and rows of each, forming a 4x4 matrix. The edges of each side were then wired to JST cables for connection to the board. The ESP32 pictured is connected to a small breakout board to make the I2C cabling easier.
+This solution was inspired by [Adafruit's keypad controller breakout](https://www.adafruit.com/product/4918#description), and their open source driver is used in this example.
+
+## Requirements
+
+- **PlatformIO** development environment
+- **ESP32** development board
+- I2C connections to TCA8418 and IS31FL3737 chips
+
+## Installation & Usage
+
+1. Clone this repository
+2. Open in PlatformIO
+3. Configure matrix dimensions in `src/main.cpp` if needed:
+   ```cpp
+   #define LED_MATRIX_ROWS 12    // IS31FL3737: 12x12 matrix
+   #define LED_MATRIX_COLS 12
+   #define KEYPAD_ROWS 8         // TCA8418: up to 8x10 matrix  
+   #define KEYPAD_COLS 10
+   ```
+4. Build and upload to ESP32
+5. Use mode button (GPIO 0) to switch between demonstration modes
+
+## Configuration
+
+- **I2C Speed**: 800kHz (configurable in setup)
+- **LED Driver Address**: 0x50 (ADDR pin to GND)
+- **Keypad Address**: 0x34 (TCA8418 default)
+- **Mode Button**: GPIO 0 with internal pullup
+- **Status LED**: GPIO 2 for diagnostics
+
+## Driver Documentation
+
+- [IS31FL373x LED Driver](https://github.com/somebox/IS31FL373x-Driver) - Complete API and hardware reference
+- [Adafruit TCA8418](https://www.adafruit.com/product/4918) - Keypad controller breakout and library
+
+## Example Hardware
+
+
+### 4x4 Button Board
+
+The test setup uses standard 16mm LED buttons (search for "R16-503") which have four contacts each. I made a small PCB for them and soldered copper rods to the columns and rows of each, forming a 4×4 matrix. The edges of each side were then wired to JST cables for connection to the board. The ESP32 pictured is connected to a small breakout board to make the I2C cabling easier.
 
 ![example button board project](docs/board-example.jpeg)
 ![example button board project](docs/button-board.jpeg)
 ![hand-wiring of the button board](docs/button-board-back.jpeg)
 
+### Radio Tuner Retrofit
+
+Hijacking the buttons and leds of an old radio tuner to use the panel to control an internet streaming music server.
+
+![radio tuner retrofit](docs/radio-tuner-retrofit.jpeg)
