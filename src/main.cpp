@@ -39,15 +39,15 @@
 #define KEYPAD_ROWS 8         // TCA8418 supports up to 8 rows
 #define KEYPAD_COLS 10        // TCA8418 supports up to 10 columns
 
-// Mode system
-enum class Mode {
-  ANIMATED = 0,
-  INTERACTIVE = 1,
-  DEBUG = 2,
-  MODE_COUNT = 3
+// Animation mode abstraction
+class AnimationMode {
+public:
+  virtual void begin() {}
+  virtual void update() = 0;
+  virtual const char* name() const = 0;
+  virtual ~AnimationMode() {}
 };
 
-Mode current_mode = Mode::ANIMATED;
 unsigned long mode_switch_debounce = 0;
 const unsigned long DEBOUNCE_TIME = 500; // 500ms debounce for mode switching
 
@@ -98,201 +98,129 @@ void clear_all_leds(){
   led_driver.show(); // Push changes to hardware
 }
 
-void animate_mode_default(){
-  // Position-dependent fade patterns where timing depends on row/col
-  unsigned long current_time = millis();
-  static unsigned long last_debug = 0;
-  static bool debug_printed = false;
-  
-  for (int row=0; row<LED_MATRIX_ROWS; row++){
-    for (int col=0; col<LED_MATRIX_COLS; col++){
-      // Create a unique phase offset based on position
-      // Each position gets a different timing pattern
-      float total_leds = LED_MATRIX_ROWS * LED_MATRIX_COLS;
-      float position_factor = (row * LED_MATRIX_COLS + col) / total_leds; // 0 to 1 based on position
-      float time_offset = position_factor * ANIMATION_CYCLE_TIME;
-      
-      // Calculate the animation phase for this LED
-      float phase = ((current_time + (unsigned long)time_offset) % ANIMATION_CYCLE_TIME) / (float)ANIMATION_CYCLE_TIME;
-      
-      // Create a fade in/out pattern using sine wave
-      float brightness_factor = (sin(phase * 2 * PI) + 1) / 2; // 0 to 1
-      
-      // Create a pattern like "00100011" by using position-dependent frequency
-      int pattern_frequency = 1 + (row + col) % 4; // 1-4 cycles per animation
-      float pattern_phase = fmod(phase * pattern_frequency, 1.0);
-      
-      // Create digital pattern (on/off) with smooth transitions
-      float pattern_value = (sin(pattern_phase * 2 * PI) > 0) ? 1.0 : 0.1;
-      
-      // Combine brightness and pattern
-      int led_brightness = (int)(brightness_factor * pattern_value * 255); // 0-255 range
-      
-      led_driver.drawPixel(col, row, led_brightness);
-      
-      // Debug: Print first few LED values
-      if (!debug_printed && row < 2 && col < 2) {
-        Serial.printf("   LED[%d][%d] = %d\n", row, col, led_brightness);
+// --- Animation Mode Implementations ---
+class AnimatedMode : public AnimationMode {
+public:
+  void begin() override {
+    animation_start_time = millis();
+  }
+  void update() override {
+    unsigned long current_time = millis();
+    for (int row=0; row<LED_MATRIX_ROWS; row++){
+      for (int col=0; col<LED_MATRIX_COLS; col++){
+        float total_leds = LED_MATRIX_ROWS * LED_MATRIX_COLS;
+        float position_factor = (row * LED_MATRIX_COLS + col) / total_leds;
+        float time_offset = position_factor * ANIMATION_CYCLE_TIME;
+        float phase = ((current_time + (unsigned long)time_offset) % ANIMATION_CYCLE_TIME) / (float)ANIMATION_CYCLE_TIME;
+        float brightness_factor = (sin(phase * 2 * PI) + 1) / 2;
+        int led_brightness = (int)(brightness_factor * 255);
+        led_driver.drawPixel(col, row, led_brightness);
       }
     }
+    led_driver.show();
   }
-  
-  // Debug info once per second
-  if (current_time - last_debug > 1000) {
-    if (!debug_printed) {
-      Serial.println("animate_mode_default: Setting LEDs and calling show()");
-      debug_printed = true;
-    }
-    last_debug = current_time;
-  }
-  
-  led_driver.show(); // Push frame buffer to hardware
-}
+  const char* name() const override { return "ANIMATED"; }
+};
 
-void animate_mode_interactive(){
-  // Interactive mode - existing functionality where user presses buttons to control LEDs
-  // Note: Only animate LEDs that correspond to actual keypad positions
-  int max_rows = min(LED_MATRIX_ROWS, KEYPAD_ROWS);
-  int max_cols = min(LED_MATRIX_COLS, KEYPAD_COLS);
-  
-  static unsigned long last_debug_print = 0;
-  static bool debug_printed = false;
-  
-  // Print debug info once when entering interactive mode
-  if (!debug_printed && millis() - last_debug_print > 1000) {
-    Serial.printf("Interactive Animation Debug: max_rows=%d, max_cols=%d\n", max_rows, max_cols);
-    debug_printed = true;
-    last_debug_print = millis();
+class InteractiveMode : public AnimationMode {
+public:
+  void begin() override {
+    clear_dots();
   }
-  
-  for (int col=0; col<max_cols; col++){
-    for (int row=0; row<max_rows; row++){
-      if (dots[row][col] == 0){
-        led_driver.drawPixel(col, row, 0); // turn off segment
-      } else {
-        float offset = sin((10000+millis()) / (dots[row][col]*1.0));
-        int brightness = (130+125*offset);
-        led_driver.drawPixel(col, row, brightness); // turn on segment
-        
-        // Debug logging for specific positions (like key 6 which maps to row=0, col=6)
-        if ((row == 0 && col == 6) && millis() - last_debug_print > 2000) {
-          Serial.printf("🔍 LED Debug row=0,col=6: dots[0][6]=%d, brightness=%d\n", dots[0][6], brightness);
-          last_debug_print = millis();
+  void update() override {
+    int max_rows = min(LED_MATRIX_ROWS, KEYPAD_ROWS);
+    int max_cols = min(LED_MATRIX_COLS, KEYPAD_COLS);
+    for (int col=0; col<max_cols; col++){
+      for (int row=0; row<max_rows; row++){
+        if (dots[row][col] == 0){
+          led_driver.drawPixel(col, row, 0);
+        } else {
+          float offset = sin((10000+millis()) / (dots[row][col]*1.0));
+          int brightness = (130+125*offset);
+          led_driver.drawPixel(col, row, brightness);
         }
-        
-        delay(3); // reduced delay for smoother animation
       }
     }
+    led_driver.show();
   }
-  led_driver.show(); // Push frame buffer to hardware
-  
-  // Reset debug flag when switching away from interactive mode
-  if (current_mode != Mode::INTERACTIVE) {
-    debug_printed = false;
-  }
-}
+  const char* name() const override { return "INTERACTIVE"; }
+};
 
-void animate_mode_debug(){
-  // Debug mode - cycles through each LED position in sequence to test wiring
-  static unsigned long last_change = 0;
-  static int current_led = 0;
-  const unsigned long LED_CHANGE_INTERVAL = 1000; // 1000ms per LED
-  // int max_to_test = LED_MATRIX_ROWS * LED_MATRIX_COLS;
-  int max_to_test = 10;
-  
-  unsigned long current_time = millis();
-  
-  if (current_time - last_change > LED_CHANGE_INTERVAL) {
-    // Clear all LEDs first
-    clear_all_leds();
-    
-    // Calculate row and col from current_led index
-    int row = current_led / LED_MATRIX_COLS;
-    int col = current_led % LED_MATRIX_COLS;
-    
-    if (row < LED_MATRIX_ROWS && col < LED_MATRIX_COLS) {
-      // Calculate SW/CS pins for IS31FL3737
-      // For IS31FL3737: SW pins are 1-12 (rows), CS pins are 1-12 (columns)
-      int sw_pin = row + 1;  // SW1-SW12 (1-based)
-      int cs_pin = col + 1;  // CS1-CS12 (1-based)
-      
-      // Get I2C address from the driver
-      uint8_t i2c_address = led_driver.getI2CAddress();
-      
-      // Turn on current LED and log immediately
-      led_driver.drawPixel(col, row, 255);
-      led_driver.show(); // Push to hardware immediately after setting pixel
-      Serial.printf("🔵 DEBUG LED ON: LED#%d, row=%d, col=%d, SW%d, CS%d, I2C=0x%02X\n", 
-                   current_led, row, col, sw_pin, cs_pin, i2c_address);
-    }
-    
-    // Move to next LED
-    current_led++;
-    if (current_led >= max_to_test) {
-      current_led = 0; // Wrap around
-      Serial.println("🔄 DEBUG: Completed full LED matrix cycle");
-    }
-    
-    last_change = current_time;
+class DebugMode : public AnimationMode {
+  unsigned long last_change = 0;
+  int current_led = 0;
+  const unsigned long LED_CHANGE_INTERVAL = 1000;
+  const int max_to_test = 10;
+public:
+  void begin() override {
+    current_led = 0;
+    last_change = 0;
   }
-}
+  void update() override {
+    unsigned long current_time = millis();
+    if (current_time - last_change > LED_CHANGE_INTERVAL) {
+      clear_all_leds();
+      int row = current_led / LED_MATRIX_COLS;
+      int col = current_led % LED_MATRIX_COLS;
+      if (row < LED_MATRIX_ROWS && col < LED_MATRIX_COLS) {
+        led_driver.drawPixel(col, row, 255);
+        led_driver.show();
+        Serial.printf("🔵 DEBUG LED ON: LED#%d, row=%d, col=%d\n", current_led, row, col);
+      }
+      current_led++;
+      if (current_led >= max_to_test) {
+        current_led = 0;
+        Serial.println("🔄 DEBUG: Completed full LED matrix cycle");
+      }
+      last_change = current_time;
+    }
+  }
+  const char* name() const override { return "DEBUG"; }
+};
 
 void timerStatusMessage(); // forward declaration
 
-void switch_mode(){
-  // Switch to next mode
-  current_mode = (Mode)(((int)current_mode + 1) % (int)Mode::MODE_COUNT);
-  
-  // Clear LEDs when switching modes
+
+// --- Animation Mode Management ---
+AnimatedMode animatedMode;
+InteractiveMode interactiveMode;
+DebugMode debugMode;
+AnimationMode* animation_modes[] = { &animatedMode, &interactiveMode, &debugMode };
+const int MODE_COUNT = sizeof(animation_modes)/sizeof(animation_modes[0]);
+int current_mode = 0;
+AnimationMode* current_animation = animation_modes[0];
+
+void switch_mode() {
+  current_mode = (current_mode + 1) % MODE_COUNT;
+  current_animation = animation_modes[current_mode];
   clear_all_leds();
-  clear_dots();
-  
-  // Manage timer based on mode
-  timer.detach(); // Stop existing timer
-  
-  // Print mode change
+  current_animation->begin();
+  timer.detach();
   Serial.print("Switched to mode: ");
-  switch(current_mode){
-    case Mode::ANIMATED:
-      Serial.println("ANIMATED");
-      animation_start_time = millis();
-      timer.attach(5, timerStatusMessage); // Re-enable fps logging (5 second period)
-      break;
-    case Mode::INTERACTIVE:
-      Serial.println("INTERACTIVE");
-      timer.attach(5, timerStatusMessage); // Re-enable fps logging (5 second period)
-      break;
-    case Mode::DEBUG:
-      Serial.println("DEBUG - LED Matrix Test (FPS logging disabled)");
-      Serial.printf("Will cycle through all %d LEDs (%dx%d matrix)\n", LED_MATRIX_ROWS * LED_MATRIX_COLS, LED_MATRIX_ROWS, LED_MATRIX_COLS);
-      // No timer attachment - fps logging disabled in debug mode
-      break;
+  Serial.println(current_animation->name());
+  if (strcmp(current_animation->name(), "DEBUG") == 0) {
+    Serial.println("DEBUG - LED Matrix Test (FPS logging disabled)");
+    Serial.printf("Will cycle through all %d LEDs (%dx%d matrix)\n", LED_MATRIX_ROWS * LED_MATRIX_COLS, LED_MATRIX_ROWS, LED_MATRIX_COLS);
+  } else {
+    timer.attach(5, timerStatusMessage);
   }
 }
 
 void check_mode_button(){
-  // Read the current state of the mode button
   bool current_state = digitalRead(MODE_BUTTON_PIN);
-  
-  // Check for button press (transition from HIGH to LOW)
   if (mode_button_last_state == HIGH && current_state == LOW) {
-    // Button was just pressed
     mode_button_pressed = true;
     Serial.println("Mode button pressed - waiting for release");
   }
-  
-  // Check for button release (transition from LOW to HIGH)
   if (mode_button_last_state == LOW && current_state == HIGH && mode_button_pressed) {
-    // Button was released after being pressed
-    unsigned long current_time = millis();
-    if (current_time - mode_switch_debounce > DEBOUNCE_TIME) {
+    unsigned long now = millis();
+    if (now - mode_switch_debounce > DEBOUNCE_TIME) {
       Serial.println("Mode button released - switching mode");
       switch_mode();
-      mode_switch_debounce = current_time;
+      mode_switch_debounce = now;
     }
     mode_button_pressed = false;
   }
-  
   mode_button_last_state = current_state;
 }
 
@@ -485,19 +413,8 @@ void loop()
     }
   }
   
-  // Run the appropriate animation based on current mode
-  switch(current_mode) {
-    case Mode::ANIMATED:
-      animate_mode_default();
-      break;
-    case Mode::INTERACTIVE:
-      animate_mode_interactive();
-      break;
-    case Mode::DEBUG:
-      animate_mode_debug();
-      // Don't increment frame counter in debug mode to avoid fps logging
-      return;
-  }
-  
+  // Run the current animation mode
+  current_animation->update();
+  if (strcmp(current_animation->name(), "DEBUG") == 0) return;
   frame++;
 }
