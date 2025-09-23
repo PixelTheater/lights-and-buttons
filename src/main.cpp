@@ -71,19 +71,10 @@ Ticker timer;   // used for periodic status messages
 IS31FL3737 led_driver(ADDR::GND);  // IS31FL3737 chip with ADDR pin connected to GND
 
 int dots[KEYPAD_ROWS][KEYPAD_COLS];
-#define RANDOM_RANGE 2000
 
-// Animation timing for the animated mode
+// Animation timing constants
 unsigned long animation_start_time = 0;
 const unsigned long ANIMATION_CYCLE_TIME = 2000; // 2 seconds per cycle
-
-void randomize_dots(){
-  for (int i=0; i<KEYPAD_ROWS; i++){
-    for (int j=0; j<KEYPAD_COLS; j++){
-      dots[i][j] = random(RANDOM_RANGE)+1;
-    }
-  }
-}
 
 void clear_dots(){
   for (int i=0; i<KEYPAD_ROWS; i++){
@@ -344,12 +335,12 @@ void setup() {
   led_driver.show();
   
   // Only attach timer for fps logging in non-debug modes
-  if (current_mode != Mode::DEBUG) {
+  if (strcmp(current_animation->name(), "DEBUG") != 0) {
     timer.attach(TIMER_PERIOD, timerStatusMessage);
   }
   
   clear_dots();
-  animation_start_time = millis();
+  current_animation->begin(); // Initialize the starting animation mode
   
   Serial.println("=== MATRIX CONFIGURATION ===");
   Serial.printf("LED Matrix: %dx%d (%d total LEDs)\n", LED_MATRIX_ROWS, LED_MATRIX_COLS, LED_MATRIX_ROWS * LED_MATRIX_COLS);
@@ -391,7 +382,7 @@ void loop()
         digitalWrite(ONBOARD_LED_PIN, HIGH);
         Serial.printf("🔴 KEYPAD PRESS\t row: %d, col: %d (key %d) - LED ON\n", row, col, k);
         
-        if (current_mode == Mode::INTERACTIVE) {
+        if (strcmp(current_animation->name(), "INTERACTIVE") == 0) {
           // Handle button press in interactive mode
           dots[row][col] = millis();
           Serial.printf("   Interactive mode: Setting dots[%d][%d] = %lu\n", row, col, dots[row][col]);
@@ -401,7 +392,7 @@ void loop()
         digitalWrite(ONBOARD_LED_PIN, LOW);
         Serial.printf("⚫ KEYPAD RELEASE\t row: %d, col: %d (key %d) - LED OFF\n", row, col, k);
         
-        if (current_mode == Mode::INTERACTIVE) {
+        if (strcmp(current_animation->name(), "INTERACTIVE") == 0) {
           // Calculate how long the button was held
           unsigned long hold_time = millis() - dots[row][col];
           dots[row][col] = hold_time;
