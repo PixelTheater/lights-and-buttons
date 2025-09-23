@@ -187,8 +187,12 @@ InteractiveMode interactiveMode;
 DebugMode debugMode;
 AnimationMode* animation_modes[] = { &animatedMode, &interactiveMode, &debugMode };
 const int MODE_COUNT = sizeof(animation_modes)/sizeof(animation_modes[0]);
-int current_mode = 0;
+int current_mode = 0; // index into animation_modes
 AnimationMode* current_animation = animation_modes[0];
+
+// Helper predicates for readability (replace old Mode enum comparisons)
+inline bool isDebugMode() { return current_animation == &debugMode; }
+inline bool isInteractiveMode() { return current_animation == &interactiveMode; }
 
 void switch_mode() {
   current_mode = (current_mode + 1) % MODE_COUNT;
@@ -344,7 +348,7 @@ void setup() {
   led_driver.show();
   
   // Only attach timer for fps logging in non-debug modes
-  if (current_mode != Mode::DEBUG) {
+  if (!isDebugMode()) {
     timer.attach(TIMER_PERIOD, timerStatusMessage);
   }
   
@@ -391,7 +395,7 @@ void loop()
         digitalWrite(ONBOARD_LED_PIN, HIGH);
         Serial.printf("🔴 KEYPAD PRESS\t row: %d, col: %d (key %d) - LED ON\n", row, col, k);
         
-        if (current_mode == Mode::INTERACTIVE) {
+        if (isInteractiveMode()) {
           // Handle button press in interactive mode
           dots[row][col] = millis();
           Serial.printf("   Interactive mode: Setting dots[%d][%d] = %lu\n", row, col, dots[row][col]);
@@ -401,7 +405,7 @@ void loop()
         digitalWrite(ONBOARD_LED_PIN, LOW);
         Serial.printf("⚫ KEYPAD RELEASE\t row: %d, col: %d (key %d) - LED OFF\n", row, col, k);
         
-        if (current_mode == Mode::INTERACTIVE) {
+        if (isInteractiveMode()) {
           // Calculate how long the button was held
           unsigned long hold_time = millis() - dots[row][col];
           dots[row][col] = hold_time;
