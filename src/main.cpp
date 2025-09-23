@@ -73,7 +73,6 @@ IS31FL3737 led_driver(ADDR::GND);  // IS31FL3737 chip with ADDR pin connected to
 int dots[KEYPAD_ROWS][KEYPAD_COLS];
 
 // Animation timing constants
-unsigned long animation_start_time = 0;
 const unsigned long ANIMATION_CYCLE_TIME = 2000; // 2 seconds per cycle
 
 void clear_dots(){
@@ -91,6 +90,7 @@ void clear_all_leds(){
 
 // --- Animation Mode Implementations ---
 class AnimatedMode : public AnimationMode {
+  unsigned long animation_start_time = 0;
 public:
   void begin() override {
     animation_start_time = millis();
