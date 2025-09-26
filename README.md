@@ -49,19 +49,25 @@ This solution was inspired by [Adafruit's keypad controller breakout](https://ww
 1. Clone this repository
 2. Open in PlatformIO
 3. Configure matrix dimensions in `src/main.cpp` if needed:
+
    ```cpp
    #define LED_MATRIX_ROWS 12    // IS31FL3737: 12x12 matrix
    #define LED_MATRIX_COLS 12
    #define KEYPAD_ROWS 8         // TCA8418: up to 8x10 matrix  
    #define KEYPAD_COLS 10
    ```
+
 4. Build and upload to ESP32
 5. Use mode button (GPIO 0) to switch between demonstration modes
 
 ## Configuration
 
 - **I2C Speed**: 800kHz (configurable in setup)
-- **LED Driver Address**: 0x50 (ADDR pin to GND)
+- **LED Driver Address**:
+  - 0x50: IS31FL3737 Display (GND) ✅ default
+  - 0x55: IS31FL3737 Display (SCL)
+  - 0x5A: IS31FL3737 Display (SDA)
+  - 0x5F: IS31FL3737 Display (VCC)
 - **Keypad Address**: 0x34 (TCA8418 default)
 - **Mode Button**: GPIO 0 with internal pullup
 - **Status LED**: GPIO 2 for diagnostics
@@ -72,7 +78,6 @@ This solution was inspired by [Adafruit's keypad controller breakout](https://ww
 - [Adafruit TCA8418](https://www.adafruit.com/product/4918) - Keypad controller breakout and library
 
 ## Example Hardware
-
 
 ### 4x4 Button Board
 
