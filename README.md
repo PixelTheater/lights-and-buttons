@@ -7,6 +7,8 @@ It features two fabulous ICs on the same PCB:
 - **TCA8418 keypad controller**: scans up to 80 separate contact points in an 8×10 matrix, with queuing and debouncing
 - **IS31FL3737 LED driver**: controls a matrix of 144 (12×12) LEDs with 256 levels of individual dimming
 
+**Demo Configuration**: This firmware is configured for 4×4 hardware (16 buttons + 16 LEDs) to match the example PCB.
+
 Both I2C devices are present on the same board with configurable addresses via jumpers. Multiple boards can be connected to support more LEDs if desired.
 
 This ESP32-based firmware demonstrates three operational modes: animated patterns, button-controlled effects, and hardware debugging.
@@ -24,8 +26,8 @@ This ESP32-based firmware demonstrates three operational modes: animated pattern
 The firmware demonstrates three operational modes:
 
 - **ANIMATED**: Automatic position-dependent fade patterns across all LEDs
-- **INTERACTIVE**: Button presses trigger corresponding LED animations  
-- **DEBUG**: Sequential LED testing for hardware validation
+- **INTERACTIVE**: Button presses toggle corresponding LEDs on/off  
+- **DEBUG**: Sequential LED testing with variable timing for hardware validation
 
 Switch between modes using the mode button (GPIO 0). The onboard LED provides visual feedback for button presses and system errors.
 
@@ -48,13 +50,13 @@ This solution was inspired by [Adafruit's keypad controller breakout](https://ww
 
 1. Clone this repository
 2. Open in PlatformIO
-3. Configure matrix dimensions in `src/main.cpp` if needed:
+3. The firmware is pre-configured for 4×4 demo hardware (16 buttons + 16 LEDs). To modify for different hardware, update the configuration in `src/main.cpp`:
 
    ```cpp
-   #define LED_MATRIX_ROWS 12    // IS31FL3737: 12x12 matrix
-   #define LED_MATRIX_COLS 12
-   #define KEYPAD_ROWS 8         // TCA8418: up to 8x10 matrix  
-   #define KEYPAD_COLS 10
+   #define DEMO_LED_ROWS 4       // Demo hardware: 4 rows of LEDs
+   #define DEMO_LED_COLS 4       // Demo hardware: 4 columns of LEDs
+   #define DEMO_KEYPAD_ROWS 4    // Demo hardware: 4 rows of buttons
+   #define DEMO_KEYPAD_COLS 4    // Demo hardware: 4 columns of buttons
    ```
 
 4. Build and upload to ESP32

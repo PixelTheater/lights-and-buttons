@@ -7,13 +7,13 @@
 
 // This example demonstrates how to use the IS31FL3737 LED driver with the Adafruit TCA8418 keypad driver.
 // The IS31FL3737 is a 12x12 LED matrix driver with PWM control for each LED. The Adafruit TCA8418 is a
-// keypad matrix driver with buffering and debouncing. This example supports configurable matrix sizes:
-// - LEDs: 12x12 matrix (144 LEDs) via IS31FL3737 I2C driver
-// - Keypad: Up to 8x10 matrix (80 buttons) via TCA8418 I2C controller
+// keypad matrix driver with buffering and debouncing. This demo is configured for 4x4 hardware:
+// - LEDs: 4x4 matrix (16 LEDs) via IS31FL3737 I2C driver
+// - Keypad: 4x4 matrix (16 buttons) via TCA8418 I2C controller
 
-// Configuration: Modify the constants below to change matrix sizes for your PCB
-// - LED_MATRIX_ROWS/COLS: Set LED matrix dimensions (IS31FL3737 hardware: 12x12 matrix, 144 LEDs)
-// - KEYPAD_ROWS/COLS: Set keypad matrix dimensions (max 8x10)
+// Demo Hardware Configuration:
+// - LED_MATRIX_ROWS/COLS: 4x4 LED matrix (16 LEDs total)
+// - KEYPAD_ROWS/COLS: 4x4 button matrix (16 buttons total)
 
 // The firmware supports multiple modes:
 // - ANIMATED: Default mode with position-dependent fade patterns across all LEDs
@@ -22,22 +22,32 @@
 // 
 // Hardware setup:
 // - Mode button: Connect a momentary button between GPIO 0 and GND
-// - Keypad: Matrix connected via TCA8418 I2C controller (configurable size)
-// - LEDs: Matrix connected via IS31FL3737 I2C driver (12x12 matrix)
+// - Keypad: 4x4 matrix connected via TCA8418 I2C controller
+// - LEDs: 4x4 matrix connected via IS31FL3737 I2C driver
 // - Built-in LED (GPIO 2): Used for error indication and keypad press diagnostics
 //
 // Usage:
 // - Press and release the mode button (GPIO 0) to switch between modes
-// - In INTERACTIVE mode, press any keypad button to control LEDs
+// - In INTERACTIVE mode, press any keypad button to toggle corresponding LED on/off
 // - Built-in LED lights up when any keypad button is pressed (diagnostic feature)
 
 // for more info see https://github.com/somebox/lights-and-buttons
 
+// Version information
+#define VERSION "1.0"
+
+// Demo hardware configuration - 4x4 matrix (16 buttons + 16 LEDs)
+// This matches the example PCB with 4x4 LED buttons
+#define DEMO_LED_ROWS 4       // Demo hardware: 4 rows of LEDs
+#define DEMO_LED_COLS 4       // Demo hardware: 4 columns of LEDs (16 LEDs total)
+#define DEMO_KEYPAD_ROWS 4    // Demo hardware: 4 rows of buttons
+#define DEMO_KEYPAD_COLS 4    // Demo hardware: 4 columns of buttons (16 buttons total)
+
 // Matrix configuration constants - modify these to match your hardware
-#define LED_MATRIX_ROWS 12    // IS31FL3737 hardware: 12 rows
-#define LED_MATRIX_COLS 12    // IS31FL3737 hardware: 12 columns (144 LEDs total)
-#define KEYPAD_ROWS 8         // TCA8418 supports up to 8 rows
-#define KEYPAD_COLS 10        // TCA8418 supports up to 10 columns
+#define LED_MATRIX_ROWS DEMO_LED_ROWS     // Use demo configuration
+#define LED_MATRIX_COLS DEMO_LED_COLS     // Use demo configuration  
+#define KEYPAD_ROWS DEMO_KEYPAD_ROWS      // Use demo configuration
+#define KEYPAD_COLS DEMO_KEYPAD_COLS      // Use demo configuration
 
 // Animation mode abstraction
 class AnimationMode {
@@ -142,11 +152,9 @@ public:
     for (int col=0; col<max_cols; col++){
       for (int row=0; row<max_rows; row++){
         if (dots[row][col] == 0){
-          led_driver.drawPixel(col, row, 0);
+          led_driver.drawPixel(col, row, 0);  // LED off
         } else {
-          float offset = sin((10000+millis()) / (dots[row][col]*1.0));
-          int brightness = (130+125*offset);
-          led_driver.drawPixel(col, row, brightness);
+          led_driver.drawPixel(col, row, 255); // LED on at full brightness
         }
       }
     }
@@ -157,8 +165,7 @@ public:
 class DebugMode : public AnimationMode {
   unsigned long last_change = 0;
   int current_led = 0;
-  const unsigned long LED_CHANGE_INTERVAL = 1000;
-  const int max_to_test = 10;
+  const int max_to_test = LED_MATRIX_ROWS * LED_MATRIX_COLS; // Test all LEDs in the grid
 public:
   void begin() override {
     current_led = 0;
@@ -166,14 +173,20 @@ public:
   }
   void update() override {
     unsigned long current_time = millis();
-    if (current_time - last_change > LED_CHANGE_INTERVAL) {
+    
+    // Calculate variable delay using sine wave (50-500ms range)
+    float time_factor = (current_time % 10000) / 10000.0f; // 10 second cycle
+    float sine_value = (sin(time_factor * 2 * PI) + 1) / 2; // 0 to 1
+    unsigned long variable_delay = 50 + (unsigned long)(sine_value * 450); // 50-500ms
+    
+    if (current_time - last_change > variable_delay) {
       clear_all_leds();
       int row = current_led / LED_MATRIX_COLS;
       int col = current_led % LED_MATRIX_COLS;
       if (row < LED_MATRIX_ROWS && col < LED_MATRIX_COLS) {
         led_driver.drawPixel(col, row, 255);
         led_driver.show();
-        Serial.printf("🔵 DEBUG LED ON: LED#%d, row=%d, col=%d\n", current_led, row, col);
+        Serial.printf("🔵 DEBUG LED #%d: (%d,%d) - delay: %lums\n", current_led, row, col, variable_delay);
       }
       current_led++;
       if (current_led >= max_to_test) {
@@ -279,6 +292,8 @@ void setup() {
     delay(10);
   }
   Serial.println(__FILE__);
+  Serial.printf("=== Lights and Buttons Demo v%s ===\n", VERSION);
+  Serial.printf("Hardware: %dx%d LEDs, %dx%d buttons\n", LED_MATRIX_ROWS, LED_MATRIX_COLS, KEYPAD_ROWS, KEYPAD_COLS);
 
   // Initialize mode / toggle button with internal pullup
   pinMode(MODE_BUTTON_PIN, INPUT_PULLUP);
