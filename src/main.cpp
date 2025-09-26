@@ -103,21 +103,6 @@ void clear_all_leds(){
   led_driver.show(); // Push changes to hardware
 }
 
-// Animation timing variables
-unsigned long animation_start_time = 0;
-const unsigned long ANIMATION_CYCLE_TIME = 3000; // ms per full pulse
-
-// Interactive mode state
-uint8_t dots[KEYPAD_ROWS][KEYPAD_COLS] = {0}; // Track which keys are pressed
-
-void clear_dots() {
-  for(int r=0; r<KEYPAD_ROWS; r++){
-    for(int c=0; c<KEYPAD_COLS; c++){
-      dots[r][c] = 0;
-    }
-  }
-}
-
 // --- Animation Mode Implementations ---
 class AnimatedMode : public AnimationMode {
   unsigned long animation_start_time = 0;
