@@ -90,7 +90,7 @@ unsigned long animation_start_time = 0;
 const unsigned long ANIMATION_CYCLE_TIME = 3000; // ms per full pulse
 
 uint8_t pulse_brightness(){
-  float phase = (millis() - animation_start_time) % ANIMATION_CYCLE_TIME / (float)ANIMATION_CYCLE_TIME; // 0..1
+  float phase = ((millis() - animation_start_time) % ANIMATION_CYCLE_TIME) / (float)ANIMATION_CYCLE_TIME; // 0..1
   float s = (sin(phase * 2 * PI) + 1.0f) * 0.5f; // 0..1
   return (uint8_t)(min_brightness + s * (global_brightness - min_brightness));
 }
