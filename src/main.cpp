@@ -70,11 +70,25 @@ Ticker timer;   // used for periodic status messages
 // CRITICAL: Use the correct driver class that matches your physical hardware chip
 IS31FL3737 led_driver(ADDR::GND);  // IS31FL3737 chip with ADDR pin connected to GND
 
-int dots[KEYPAD_ROWS][KEYPAD_COLS];
+// Per-key timing / brightness seed used when a key is pressed.
+// 0 means "inactive".
+unsigned long key_activation_time[KEYPAD_ROWS][KEYPAD_COLS];
+
+// Interactive mode state
+uint8_t dots[KEYPAD_ROWS][KEYPAD_COLS] = {0}; // Track which keys are pressed
 
 // Animation timing constants
-const unsigned long ANIMATION_CYCLE_TIME = 2000; // 2 seconds per cycle
+unsigned long animation_start_time = 0;
+const unsigned long ANIMATION_CYCLE_TIME = 3000; // 3 seconds per cycle
 
+// Simple helper resets all key state
+void clear_key_state(){
+  for(int r=0;r<KEYPAD_ROWS;r++){
+    for(int c=0;c<KEYPAD_COLS;c++){
+      key_activation_time[r][c] = 0;
+    }
+  }
+}
 void clear_dots(){
   for (int i=0; i<KEYPAD_ROWS; i++){
     for (int j=0; j<KEYPAD_COLS; j++){
@@ -136,7 +150,6 @@ public:
   }
   const char* name() const override { return "INTERACTIVE"; }
 };
-
 class DebugMode : public AnimationMode {
   unsigned long last_change = 0;
   int current_led = 0;
@@ -169,8 +182,9 @@ public:
   const char* name() const override { return "DEBUG"; }
 };
 
-void timerStatusMessage(); // forward declaration
-
+void timerStatusMessage() {
+  Serial.printf("Mode: %s | FPS: %.1f\n", current_animation->name(), frames / 5.0);
+}
 
 // --- Animation Mode Management ---
 AnimatedMode animatedMode;
@@ -180,7 +194,6 @@ AnimationMode* animation_modes[] = { &animatedMode, &interactiveMode, &debugMode
 const int MODE_COUNT = sizeof(animation_modes)/sizeof(animation_modes[0]);
 int current_mode = 0;
 AnimationMode* current_animation = animation_modes[0];
-
 void switch_mode() {
   current_mode = (current_mode + 1) % MODE_COUNT;
   current_animation = animation_modes[current_mode];
@@ -243,15 +256,18 @@ void handle_system_error(const char* error_message) {
   }
 }
 
-#define TIMER_PERIOD 5
-static long frame = 1;
-static long last_frames = 0;
-void timerStatusMessage(){
-  Serial.println("-----");
-  Serial.printf("frame: %d\n", frame);
-  float fps = (frame - last_frames) / TIMER_PERIOD;
-  Serial.printf("fps: %f\n", fps);
-  last_frames = frame;
+// Optional: very lightweight FPS counter for insight (no Ticker needed)
+unsigned long last_fps_log = 0;
+unsigned long frames = 0;
+void maybeLogFPS(){
+  frames++;
+  unsigned long now = millis();
+  if(now - last_fps_log > 5000){
+    float fps = frames / ((now - last_fps_log)/1000.0f + 0.001f);
+    Serial.printf("[INFO] approx fps=%.1f (frames=%lu)\n", fps, frames);
+    last_fps_log = now;
+    frames = 0;
+  }
 }
 
 void setup() {
@@ -261,16 +277,17 @@ void setup() {
   }
   Serial.println(__FILE__);
 
-  // Initialize mode button with internal pullup
+  // Initialize mode / toggle button with internal pullup
   pinMode(MODE_BUTTON_PIN, INPUT_PULLUP);
-  Serial.printf("Mode button initialized on GPIO %d with pullup\n", MODE_BUTTON_PIN);
+  Serial.printf("Button initialized on GPIO %d (toggle animation)\n", MODE_BUTTON_PIN);
 
   // Initialize onboard LED for error indication and keypad diagnostics
   pinMode(ONBOARD_LED_PIN, OUTPUT);
   digitalWrite(ONBOARD_LED_PIN, LOW); // Start with LED off
   Serial.printf("Onboard LED initialized on GPIO %d for error indication and keypad diagnostics\n", ONBOARD_LED_PIN);
 
-  Wire.begin(22,21);
+  // Wire.begin(21,22);
+  Wire.begin();
   Wire.setClock(800000); // use 800 kHz I2C
   Serial.print("I2C speed is ");
   Serial.println(Wire.getClock());
@@ -334,19 +351,18 @@ void setup() {
   led_driver.clear();
   led_driver.show();
   
-  // Only attach timer for fps logging in non-debug modes
-  if (strcmp(current_animation->name(), "DEBUG") != 0) {
-    timer.attach(TIMER_PERIOD, timerStatusMessage);
-  }
-  
+  clear_key_state();
   clear_dots();
-  current_animation->begin(); // Initialize the starting animation mode
+  
+  // Initialize the first mode
+  current_animation->begin();
+  timer.attach(5, timerStatusMessage);
   
   Serial.println("=== MATRIX CONFIGURATION ===");
   Serial.printf("LED Matrix: %dx%d (%d total LEDs)\n", LED_MATRIX_ROWS, LED_MATRIX_COLS, LED_MATRIX_ROWS * LED_MATRIX_COLS);
   Serial.printf("Keypad Matrix: %dx%d (%d total buttons)\n", KEYPAD_ROWS, KEYPAD_COLS, KEYPAD_ROWS * KEYPAD_COLS);
   Serial.println("============================");
-  Serial.println("Starting in ANIMATED mode (default)");
+  Serial.printf("Starting in mode: %s\n", current_animation->name());
 }
 
 
@@ -358,10 +374,10 @@ void loop()
     return;
   }
   
-  // Check mode button (separate GPIO pin)
+  // Check mode button
   check_mode_button();
   
-  // Handle keypad input (only for interactive mode)
+  // Handle keypad input
   if (keypad.available() > 0)
   {
     //  datasheet page 15 - Table 1
@@ -372,32 +388,27 @@ void loop()
     
     // Calculate row and column based on the configured keypad matrix size
     // TCA8418 uses row-major ordering: key_number = row * KEYPAD_COLS + col
-    int row = k / KEYPAD_COLS;
-    int col = k % KEYPAD_COLS;
+    // The postion calculation will depend on how the buttons and leds are wired to the TCA8418.
+    int col = 3 - (k / KEYPAD_COLS);
+    int row = k % KEYPAD_COLS;
     
     // Bounds check to ensure we don't exceed our matrix dimensions
     if (row >= 0 && row < KEYPAD_ROWS && col >= 0 && col < KEYPAD_COLS) {
       if (pressed) {
-        // Diagnostic: Light up built-in LED when any button is pressed
-        digitalWrite(ONBOARD_LED_PIN, HIGH);
-        Serial.printf("🔴 KEYPAD PRESS\t row: %d, col: %d (key %d) - LED ON\n", row, col, k);
-        
+        digitalWrite(ONBOARD_LED_PIN, HIGH); // any keypress indicator
+        key_activation_time[row][col] = millis();
+        // Update dots array for InteractiveMode
         if (strcmp(current_animation->name(), "INTERACTIVE") == 0) {
-          // Handle button press in interactive mode
-          dots[row][col] = millis();
-          Serial.printf("   Interactive mode: Setting dots[%d][%d] = %lu\n", row, col, dots[row][col]);
+          dots[row][col] = 1;
         }
+        Serial.printf("KEY PRESS r=%d c=%d (key=%d)\n", row, col, k);
       } else {
-        // Diagnostic: Turn off built-in LED when button is released
         digitalWrite(ONBOARD_LED_PIN, LOW);
-        Serial.printf("⚫ KEYPAD RELEASE\t row: %d, col: %d (key %d) - LED OFF\n", row, col, k);
-        
+        // Clear dots array for InteractiveMode
         if (strcmp(current_animation->name(), "INTERACTIVE") == 0) {
-          // Calculate how long the button was held
-          unsigned long hold_time = millis() - dots[row][col];
-          dots[row][col] = hold_time;
-          Serial.printf("   Button held for %lu ms\n", hold_time);
+          dots[row][col] = 0;
         }
+        Serial.printf("KEY RELEASE r=%d c=%d (key=%d)\n", row, col, k);
       }
     } else {
       Serial.printf("❌ KEYPAD EVENT OUT OF BOUNDS: key %d -> row: %d, col: %d (max %dx%d)\n", k, row, col, KEYPAD_ROWS, KEYPAD_COLS);
@@ -407,5 +418,5 @@ void loop()
   // Run the current animation mode
   current_animation->update();
   if (strcmp(current_animation->name(), "DEBUG") == 0) return;
-  frame++;
+  maybeLogFPS();
 }
