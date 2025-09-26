@@ -120,6 +120,7 @@ void clear_dots() {
 
 // --- Animation Mode Implementations ---
 class AnimatedMode : public AnimationMode {
+  unsigned long animation_start_time = 0;
 public:
   void begin() override {
     animation_start_time = millis();
