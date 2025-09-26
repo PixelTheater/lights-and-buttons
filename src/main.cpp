@@ -81,6 +81,10 @@ uint8_t dots[KEYPAD_ROWS][KEYPAD_COLS] = {0}; // Track which keys are pressed
 unsigned long animation_start_time = 0;
 const unsigned long ANIMATION_CYCLE_TIME = 3000; // 3 seconds per cycle
 
+// FPS logging variables
+unsigned long last_fps_log = 0;
+unsigned long frames = 0;
+
 // Simple helper resets all key state
 void clear_key_state(){
   for(int r=0;r<KEYPAD_ROWS;r++){
@@ -182,10 +186,6 @@ public:
   const char* name() const override { return "DEBUG"; }
 };
 
-void timerStatusMessage() {
-  Serial.printf("Mode: %s | FPS: %.1f\n", current_animation->name(), frames / 5.0);
-}
-
 // --- Animation Mode Management ---
 AnimatedMode animatedMode;
 InteractiveMode interactiveMode;
@@ -194,6 +194,11 @@ AnimationMode* animation_modes[] = { &animatedMode, &interactiveMode, &debugMode
 const int MODE_COUNT = sizeof(animation_modes)/sizeof(animation_modes[0]);
 int current_mode = 0;
 AnimationMode* current_animation = animation_modes[0];
+
+void timerStatusMessage() {
+  Serial.printf("Mode: %s | FPS: %.1f\n", current_animation->name(), frames / 5.0);
+}
+
 void switch_mode() {
   current_mode = (current_mode + 1) % MODE_COUNT;
   current_animation = animation_modes[current_mode];
@@ -257,8 +262,6 @@ void handle_system_error(const char* error_message) {
 }
 
 // Optional: very lightweight FPS counter for insight (no Ticker needed)
-unsigned long last_fps_log = 0;
-unsigned long frames = 0;
 void maybeLogFPS(){
   frames++;
   unsigned long now = millis();
