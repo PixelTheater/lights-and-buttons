@@ -193,9 +193,10 @@ void maybeLogFPS(){
   frames++;
   unsigned long now = millis();
   if(now - last_fps_log > 5000){
-    float fps = frames / ((now - animation_start_time)/1000.0f + 0.001f);
+    float fps = frames / ((now - last_fps_log)/1000.0f + 0.001f);
     Serial.printf("[INFO] approx fps=%.1f (frames=%lu)\n", fps, frames);
     last_fps_log = now;
+    frames = 0;
   }
 }
 
