@@ -215,7 +215,8 @@ void setup() {
   digitalWrite(ONBOARD_LED_PIN, LOW); // Start with LED off
   Serial.printf("Onboard LED initialized on GPIO %d for error indication and keypad diagnostics\n", ONBOARD_LED_PIN);
 
-  Wire.begin(22,21);
+  // Wire.begin(21,22);
+  Wire.begin();
   Wire.setClock(800000); // use 800 kHz I2C
   Serial.print("I2C speed is ");
   Serial.println(Wire.getClock());
@@ -312,8 +313,9 @@ void loop()
     
     // Calculate row and column based on the configured keypad matrix size
     // TCA8418 uses row-major ordering: key_number = row * KEYPAD_COLS + col
-    int row = k / KEYPAD_COLS;
-    int col = k % KEYPAD_COLS;
+    // The postion calculation will depend on how the buttons and leds are wired to the TCA8418.
+    int col = 3 - (k / KEYPAD_COLS);
+    int row = k % KEYPAD_COLS;
     
     // Bounds check to ensure we don't exceed our matrix dimensions
     if (row >= 0 && row < KEYPAD_ROWS && col >= 0 && col < KEYPAD_COLS) {
