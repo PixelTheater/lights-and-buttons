@@ -74,11 +74,26 @@ IS31FL3737 led_driver(ADDR::GND);  // IS31FL3737 chip with ADDR pin connected to
 // 0 means "inactive".
 unsigned long key_activation_time[KEYPAD_ROWS][KEYPAD_COLS];
 
+// Interactive mode state
+uint8_t dots[KEYPAD_ROWS][KEYPAD_COLS] = {0}; // Track which keys are pressed
+
+// Animation timing constants
+unsigned long animation_start_time = 0;
+const unsigned long ANIMATION_CYCLE_TIME = 3000; // 3 seconds per cycle
+
 // Simple helper resets all key state
 void clear_key_state(){
   for(int r=0;r<KEYPAD_ROWS;r++){
     for(int c=0;c<KEYPAD_COLS;c++){
       key_activation_time[r][c] = 0;
+    }
+  }
+}
+
+void clear_dots(){
+  for (int i=0; i<KEYPAD_ROWS; i++){
+    for (int j=0; j<KEYPAD_COLS; j++){
+      dots[i][j] = 0;
     }
   }
 }
