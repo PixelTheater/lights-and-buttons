@@ -77,13 +77,15 @@ This solution was inspired by [Adafruit's keypad controller breakout](https://ww
 ## Driver Documentation
 
 - [IS31FL373x LED Driver](https://github.com/somebox/IS31FL373x-Driver) - Complete API and hardware reference
-- [Adafruit TCA8418](https://www.adafruit.com/product/4918) - Keypad controller breakout and library
+- [Adafruit TCA8418 Driver](https://github.com/adafruit/Adafruit_TCA8418) - Keypad controller breakout and library
+
+Adafruit also makes a nice [keypad breakout board](https://www.adafruit.com/product/4918) that is compatible with this firmware.
 
 ## Example Hardware
 
 ### 4x4 Button Board
 
-The test setup uses standard 16mm LED buttons (search for "R16-503") which have four contacts each. I made a small PCB for them and soldered copper rods to the columns and rows of each, forming a 4×4 matrix. The edges of each side were then wired to JST cables for connection to the board. The ESP32 pictured is connected to a small breakout board to make the I2C cabling easier.
+The test setup uses standard 16mm LED buttons ([search for "R16-503"](https://www.google.com/search?q=site%3Aaliexpress.com+R16-503)) which have four contacts (button+LED). I made a small PCB for them and soldered copper rods to the columns and rows of each, forming a 4×4 matrix. The edges of each side were then wired to JST cables for connection to the board. The ESP32 pictured is connected to a small breakout board to make the I2C cabling easier.
 
 ![example button board project](docs/board-example.jpeg)
 ![example button board project](docs/button-board.jpeg)
@@ -91,6 +93,6 @@ The test setup uses standard 16mm LED buttons (search for "R16-503") which have 
 
 ### Radio Tuner Retrofit
 
-Hijacking the buttons and leds of an old radio tuner to use the panel to control an internet streaming music server.
+Work in progress: Hijacking the buttons and leds of an old radio tuner to use the panel to control an internet streaming music server.
 
 ![radio tuner retrofit](docs/radio-tuner-retrofit.jpeg)

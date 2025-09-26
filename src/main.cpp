@@ -44,10 +44,10 @@
 #define DEMO_KEYPAD_COLS 4    // Demo hardware: 4 columns of buttons (16 buttons total)
 
 // Matrix configuration constants - modify these to match your hardware
-#define LED_MATRIX_ROWS DEMO_LED_ROWS     // Use demo configuration
-#define LED_MATRIX_COLS DEMO_LED_COLS     // Use demo configuration  
-#define KEYPAD_ROWS DEMO_KEYPAD_ROWS      // Use demo configuration
-#define KEYPAD_COLS DEMO_KEYPAD_COLS      // Use demo configuration
+#define LED_MATRIX_ROWS 12     // Use demo configuration
+#define LED_MATRIX_COLS 12     // Use demo configuration  
+#define KEYPAD_ROWS 10      // Use demo configuration
+#define KEYPAD_COLS 8      // Use demo configuration
 
 // Animation mode abstraction
 class AnimationMode {
@@ -125,8 +125,8 @@ public:
   }
   void update() override {
     unsigned long current_time = millis();
-    for (int row=0; row<LED_MATRIX_ROWS; row++){
-      for (int col=0; col<LED_MATRIX_COLS; col++){
+    for (int row=0; row<DEMO_LED_ROWS; row++){
+      for (int col=0; col<DEMO_LED_COLS; col++){
         float total_leds = LED_MATRIX_ROWS * LED_MATRIX_COLS;
         float position_factor = (row * LED_MATRIX_COLS + col) / total_leds;
         float time_offset = position_factor * ANIMATION_CYCLE_TIME;
@@ -147,10 +147,8 @@ public:
     clear_dots();
   }
   void update() override {
-    int max_rows = min(LED_MATRIX_ROWS, KEYPAD_ROWS);
-    int max_cols = min(LED_MATRIX_COLS, KEYPAD_COLS);
-    for (int col=0; col<max_cols; col++){
-      for (int row=0; row<max_rows; row++){
+    for (int col=0; col<DEMO_KEYPAD_COLS; col++){
+      for (int row=0; row<DEMO_KEYPAD_ROWS; row++){
         if (dots[row][col] == 0){
           led_driver.drawPixel(col, row, 0);  // LED off
         } else {
@@ -165,7 +163,7 @@ public:
 class DebugMode : public AnimationMode {
   unsigned long last_change = 0;
   int current_led = 0;
-  const int max_to_test = LED_MATRIX_ROWS * LED_MATRIX_COLS; // Test all LEDs in the grid
+  const int max_to_test = DEMO_LED_ROWS * DEMO_LED_COLS; // Test all LEDs in the grid
 public:
   void begin() override {
     current_led = 0;
@@ -181,9 +179,9 @@ public:
     
     if (current_time - last_change > variable_delay) {
       clear_all_leds();
-      int row = current_led / LED_MATRIX_COLS;
-      int col = current_led % LED_MATRIX_COLS;
-      if (row < LED_MATRIX_ROWS && col < LED_MATRIX_COLS) {
+      int row = current_led / DEMO_LED_COLS;
+      int col = current_led % DEMO_LED_COLS;
+      if (row < DEMO_LED_ROWS && col < DEMO_LED_COLS) {
         led_driver.drawPixel(col, row, 255);
         led_driver.show();
         Serial.printf("🔵 DEBUG LED #%d: (%d,%d) - delay: %lums\n", current_led, row, col, variable_delay);
@@ -222,7 +220,7 @@ void switch_mode() {
   Serial.println(current_animation->name());
   if (strcmp(current_animation->name(), "DEBUG") == 0) {
     Serial.println("DEBUG - LED Matrix Test (FPS logging disabled)");
-    Serial.printf("Will cycle through all %d LEDs (%dx%d matrix)\n", LED_MATRIX_ROWS * LED_MATRIX_COLS, LED_MATRIX_ROWS, LED_MATRIX_COLS);
+    Serial.printf("Will cycle through all %d LEDs (%dx%d matrix)\n", DEMO_LED_ROWS * DEMO_LED_COLS, DEMO_LED_ROWS, DEMO_LED_COLS);
   } else {
     timer.attach(5, timerStatusMessage);
   }
@@ -405,27 +403,25 @@ void loop()
     k--;
     
     // Calculate row and column based on the configured keypad matrix size
-    // TCA8418 uses row-major ordering: key_number = row * KEYPAD_COLS + col
-    // For 4x4 demo starting at (0,0): row = k / 4, col = k % 4
-    int row = k / KEYPAD_COLS;  // Row = key number divided by columns (4)
-    int col = k % KEYPAD_COLS;  // Column = key number modulo columns (4)
+    // TCA8418 uses column-major ordering, but we need row-major for our LED matrix
+    // Convert from TCA8418's column-major to our row-major with column reversal
+    // Formula: col = DEMO_KEYPAD_COLS - (k / KEYPAD_ROWS) - 1, row = k % KEYPAD_ROWS
+    int col = DEMO_KEYPAD_COLS - (k / KEYPAD_ROWS) - 1; 
+    int row = k % KEYPAD_ROWS; 
     
     // Bounds check to ensure we don't exceed our matrix dimensions
     if (row >= 0 && row < KEYPAD_ROWS && col >= 0 && col < KEYPAD_COLS) {
       if (pressed) {
         digitalWrite(ONBOARD_LED_PIN, HIGH); // any keypress indicator
         key_activation_time[row][col] = millis();
-        // Update dots array for InteractiveMode
+        // Toggle dots array for InteractiveMode on key press
         if (strcmp(current_animation->name(), "INTERACTIVE") == 0) {
-          dots[row][col] = 1;
+          dots[row][col] = !dots[row][col]; // Toggle the LED state
         }
-        Serial.printf("KEY PRESS r=%d c=%d (key=%d)\n", row, col, k);
+        Serial.printf("KEY PRESS r=%d c=%d (key=%d) - LED %s\n", row, col, k, 
+                      (strcmp(current_animation->name(), "INTERACTIVE") == 0 && dots[row][col]) ? "ON" : "OFF");
       } else {
         digitalWrite(ONBOARD_LED_PIN, LOW);
-        // Clear dots array for InteractiveMode
-        if (strcmp(current_animation->name(), "INTERACTIVE") == 0) {
-          dots[row][col] = 0;
-        }
         Serial.printf("KEY RELEASE r=%d c=%d (key=%d)\n", row, col, k);
       }
     } else {
